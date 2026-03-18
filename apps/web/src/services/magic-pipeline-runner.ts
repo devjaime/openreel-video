@@ -107,6 +107,14 @@ function isEnabled(id: PipelineStepId): boolean {
   return store().steps.find((s) => s.id === id)?.enabled ?? false;
 }
 
+/**
+ * Give the browser event loop a chance to paint UI updates and handle input.
+ * Call this between heavy sync operations to prevent the tab from freezing.
+ */
+function yieldToUI(): Promise<void> {
+  return new Promise((r) => setTimeout(r, 0));
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Main runner
 // ──────────────────────────────────────────────────────────────────────────────
@@ -123,10 +131,14 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
   const activeProvider = getActiveAiProvider();
   const hasApiKey = !!activeProvider;
 
-  try {
-    // ── Pre-check: get timeline audio buffer ──────────────────────────────
-    // Used by steps 1, 2, 3 — extracted once and shared
+  // Lazy audio buffer getter — extracted on first use, cached for subsequent steps
+  async function getAudio(): Promise<AudioBuffer | null> {
+    if (timelineAudioBuffer) return timelineAudioBuffer;
     timelineAudioBuffer = await getTimelineAudioBuffer(audioCtx);
+    return timelineAudioBuffer;
+  }
+
+  try {
 
     // ══════════════════════════════════════════════════════════════════════
     // STEP 1: Stem separation (voice ↔ background)
@@ -134,13 +146,15 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
     if (isEnabled("stem-separation")) {
       setRunning("stem-separation");
       try {
-        if (!timelineAudioBuffer) {
+        const audioBuf = await getAudio();
+        await yieldToUI();
+        if (!audioBuf) {
           setSkipped("stem-separation", "Importa un video o audio primero");
         } else {
           setDetail("stem-separation", "Analizando espectrograma…");
-          const mono = monoMix(timelineAudioBuffer);
+          const mono = monoMix(audioBuf);
           const separator = new StemSeparator({ fftSize: 2048, hopSize: 512 });
-          const result = await separator.separate(mono, timelineAudioBuffer.sampleRate, (f) =>
+          const result = await separator.separate(mono, audioBuf.sampleRate, (f) =>
             setProgress("stem-separation", f),
           );
           voiceBuffer = audioCtx.createBuffer(1, result.voice.length, result.sampleRate);
@@ -151,6 +165,7 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
     } else { setSkipped("stem-separation"); }
 
     if (shouldAbort()) return finishAborted();
+    await yieldToUI(); // ← let browser paint Step 1 result
 
     // ══════════════════════════════════════════════════════════════════════
     // STEP 2: Audio enhancement (noise reduction)
@@ -158,7 +173,8 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
     if (isEnabled("audio-enhancement")) {
       setRunning("audio-enhancement");
       try {
-        const targetBuffer = voiceBuffer ?? timelineAudioBuffer;
+        const targetBuffer = voiceBuffer ?? (await getAudio());
+        await yieldToUI();
         if (!targetBuffer) {
           setSkipped("audio-enhancement", "Sin audio disponible");
         } else {
@@ -177,6 +193,7 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
     } else { setSkipped("audio-enhancement"); }
 
     if (shouldAbort()) return finishAborted();
+    await yieldToUI();
 
     // ══════════════════════════════════════════════════════════════════════
     // STEP 3: Silence detection & trimming
@@ -184,7 +201,8 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
     if (isEnabled("silence-trimming")) {
       setRunning("silence-trimming");
       try {
-        const targetBuf = voiceBuffer ?? timelineAudioBuffer;
+        const targetBuf = voiceBuffer ?? (await getAudio());
+        await yieldToUI();
         if (!targetBuf) {
           setSkipped("silence-trimming", "Sin audio — importa un video primero");
         } else {
@@ -197,12 +215,17 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
           let silenceCount = 0;
           let inSilence = false;
           let silenceStart = 0;
+          const chunkSize = 100_000; // process in chunks to avoid blocking
           for (let i = 0; i < data.length; i++) {
             const isSilent = Math.abs(data[i]) < threshold;
             if (isSilent && !inSilence) { inSilence = true; silenceStart = i; }
             else if (!isSilent && inSilence) {
               if (i - silenceStart >= minSilenceSamples) silenceCount++;
               inSilence = false;
+            }
+            if (i % chunkSize === 0 && i > 0) {
+              setProgress("silence-trimming", 0.3 + (i / data.length) * 0.6);
+              await yieldToUI();
             }
           }
           setProgress("silence-trimming", 1.0);
@@ -216,6 +239,7 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
     } else { setSkipped("silence-trimming"); }
 
     if (shouldAbort()) return finishAborted();
+    await yieldToUI();
 
     // ══════════════════════════════════════════════════════════════════════
     // STEP 4: Transcription (Whisper — AUTOMATIC)
@@ -299,6 +323,7 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
     } else { setSkipped("transcription"); }
 
     if (shouldAbort()) return finishAborted();
+    await yieldToUI();
 
     // ══════════════════════════════════════════════════════════════════════
     // STEP 5: Filler detection & removal
@@ -350,6 +375,7 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
     } else { setSkipped("filler-removal"); }
 
     if (shouldAbort()) return finishAborted();
+    await yieldToUI();
 
     // ══════════════════════════════════════════════════════════════════════
     // STEP 6: Subtitles confirmation
@@ -367,6 +393,7 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
     } else { setSkipped("subtitles"); }
 
     if (shouldAbort()) return finishAborted();
+    await yieldToUI();
 
     // ══════════════════════════════════════════════════════════════════════
     // STEP 7: Reels cutting (best moments)
@@ -424,6 +451,7 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
     } else { setSkipped("reels-cutting"); }
 
     if (shouldAbort()) return finishAborted();
+    await yieldToUI();
 
     // ══════════════════════════════════════════════════════════════════════
     // STEP 8: Thumbnail generation (Google AI / OpenRouter / skip)
@@ -493,6 +521,7 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
     } else { setSkipped("thumbnail-generation"); }
 
     if (shouldAbort()) return finishAborted();
+    await yieldToUI();
 
     // ══════════════════════════════════════════════════════════════════════
     // STEP 9: Export — renders and downloads MP4 per platform
@@ -527,6 +556,7 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
               setDetail("export-packages", `Exportando ${spec.name} (${i + 1}/${platforms.length})…`);
 
               try {
+                await yieldToUI(); // let browser breathe between exports
                 const filename = `${projectName}_${id}.mp4`;
                 const writable = createDownloadStream(filename, "video/mp4");
                 const videoSettings = {
