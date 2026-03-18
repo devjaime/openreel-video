@@ -79,7 +79,10 @@ export class GoogleAiClient {
   async generateImage(
     prompt: string,
     options: {
-      /** Default: "imagen-3.0-generate-002" */
+      /**
+       * Default: "gemini-2.0-flash-preview-image-generation" (free AI Studio key).
+       * Use "imagen-3.0-generate-002" only if you have Google Cloud billing enabled.
+       */
       model?: string;
       /** 1–4. Default: 1 */
       sampleCount?: number;
@@ -88,10 +91,15 @@ export class GoogleAiClient {
     } = {},
   ): Promise<GoogleAiImageResult> {
     const {
-      model = "imagen-3.0-generate-002",
+      model = "gemini-2.0-flash-preview-image-generation",
       sampleCount = 1,
       aspectRatio = "16:9",
     } = options;
+
+    // If the default Gemini model is requested, skip the Imagen 3 endpoint entirely
+    if (model === "gemini-2.0-flash-preview-image-generation") {
+      return this.generateImageWithGemini(prompt);
+    }
 
     try {
       // Imagen 3 uses the :predict endpoint
@@ -111,12 +119,9 @@ export class GoogleAiClient {
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        // Fallback: try Gemini 2.0 Flash image generation
-        if (res.status === 400 || res.status === 403) {
-          return this.generateImageWithGemini(prompt);
-        }
-        return { success: false, error: `HTTP ${res.status}: ${errText}` };
+        // Imagen 3 requires billing enabled in Google Cloud.
+        // Fallback to Gemini 2.0 Flash image-gen (works with free AI Studio keys) on ANY error.
+        return this.generateImageWithGemini(prompt);
       }
 
       const data = (await res.json()) as {
