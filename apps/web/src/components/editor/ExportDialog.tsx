@@ -17,6 +17,7 @@ import {
   Zap,
   CheckCircle,
   Info,
+  Smartphone,
 } from "lucide-react";
 import {
   Dialog,
@@ -43,6 +44,7 @@ import {
   type PlatformExportPreset,
 } from "../../services/export-presets";
 import type { VideoExportSettings, UpscaleQuality } from "@openreel/core";
+import { SocialExportSelector } from "./SocialExportSelector";
 import {
   getDeviceProfile,
   estimateExportTime,
@@ -60,6 +62,8 @@ interface ExportDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onExport: (settings: VideoExportSettings) => void;
+  /** Called when user wants to resize project canvas (social presets) */
+  onAdaptCanvas?: (width: number, height: number, frameRate: number) => void;
   duration?: number;
   projectWidth?: number;
   projectHeight?: number;
@@ -121,11 +125,12 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   isOpen,
   onClose,
   onExport,
+  onAdaptCanvas,
   duration = 0,
   projectWidth = 1920,
   projectHeight = 1080,
 }) => {
-  const [activeTab, setActiveTab] = useState<"presets" | "custom">("presets");
+  const [activeTab, setActiveTab] = useState<"social" | "presets" | "custom">("social");
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(
     "recommended",
   );
@@ -252,6 +257,21 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     onClose();
   }, [activeTab, selectedPreset, customSettings, onExport, onClose]);
 
+  const handleSocialExport = useCallback(
+    (settings: VideoExportSettings) => {
+      onExport(settings);
+      onClose();
+    },
+    [onExport, onClose],
+  );
+
+  const handleAdaptCanvas = useCallback(
+    (w: number, h: number, fps: number) => {
+      onAdaptCanvas?.(w, h, fps);
+    },
+    [onAdaptCanvas],
+  );
+
   const formatFileSize = (bitrate: number, durationSec: number): string => {
     const bytes = (bitrate * 1000 * durationSec) / 8;
     if (bytes < 1024 * 1024) {
@@ -285,10 +305,17 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
 
         <Tabs
           value={activeTab}
-          onValueChange={(v) => setActiveTab(v as "presets" | "custom")}
+          onValueChange={(v) => setActiveTab(v as "social" | "presets" | "custom")}
           className="flex-1 flex flex-col overflow-hidden"
         >
           <TabsList className="flex border-b border-border bg-transparent rounded-none">
+            <TabsTrigger
+              value="social"
+              className="flex-1 flex items-center justify-center gap-2 p-3 text-sm font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary text-text-secondary hover:text-text-primary"
+            >
+              <Smartphone size={16} />
+              Exportar para…
+            </TabsTrigger>
             <TabsTrigger
               value="presets"
               className="flex-1 flex items-center justify-center gap-2 p-3 text-sm font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary text-text-secondary hover:text-text-primary"
@@ -304,6 +331,17 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
               Custom
             </TabsTrigger>
           </TabsList>
+
+          {/* ── Social "Exportar para…" tab ────────────────────────────────── */}
+          <TabsContent value="social" className="flex-1 overflow-hidden flex flex-col mt-0 p-4">
+            <SocialExportSelector
+              onApply={handleSocialExport}
+              onAdaptCanvas={handleAdaptCanvas}
+              projectWidth={projectWidth}
+              projectHeight={projectHeight}
+              duration={duration}
+            />
+          </TabsContent>
 
           <TabsContent value="presets" className="flex-1 overflow-hidden flex mt-0">
               <div className="w-48 border-r border-border overflow-y-auto">
@@ -853,13 +891,15 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
             <Button variant="ghost" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              onClick={handleExport}
-              disabled={activeTab === "presets" && !selectedPreset}
-            >
-              <Play size={16} />
-              Start Export
-            </Button>
+            {activeTab !== "social" && (
+              <Button
+                onClick={handleExport}
+                disabled={activeTab === "presets" && !selectedPreset}
+              >
+                <Play size={16} />
+                Start Export
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>

@@ -369,6 +369,38 @@ export const EditorInterface: React.FC = () => {
 
       <SpotlightTour />
       <MoGraphTour />
+
+      {/* Discrete footer — always visible at the very bottom of the editor */}
+      <div className="shrink-0 flex items-center justify-end gap-1.5 px-3 py-0.5 bg-background-tertiary border-t border-border/40 text-[9px] text-text-muted select-none">
+        <span>Built by</span>
+        <a
+          href="https://github.com/devjaime"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary hover:underline"
+        >
+          devjaime
+        </a>
+        <span className="text-border">·</span>
+        <a
+          href="https://jaimehernandez.dev"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:underline hover:text-text-secondary"
+        >
+          jaimehernandez.dev
+        </a>
+        <span className="text-border">·</span>
+        <span>Powered by</span>
+        <a
+          href="https://github.com/Augani/openreel-video"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:underline hover:text-text-secondary"
+        >
+          OpenReel
+        </a>
+      </div>
     </div>
   );
 };

@@ -1,302 +1,189 @@
-# OpenReel Video
+# VideoForge 🎬
 
-> **The open source CapCut alternative. Professional video editing in your browser. No uploads. No installs. 100% open source.**
+> **Fork de [OpenReel Video](https://github.com/Augani/openreel-video) con features de IA integradas: auto-subtítulos Whisper, detector de muletillas en español y presets optimizados para redes sociales.**
 
-OpenReel Video is a fully-featured browser-based video editor that runs entirely client-side. Built with React, TypeScript, WebCodecs, and WebGPU for professional-grade video editing without the need for expensive software or cloud processing.
+VideoForge es un editor de video profesional que corre 100% en el navegador. Construido sobre la base open-source de OpenReel, este fork agrega herramientas impulsadas por IA orientadas a creadores de contenido en español.
 
-**[Try it Live](https://openreel.video)** | **[Documentation](CONTRIBUTING.md)** | **[Discussions](https://github.com/Augani/openreel-video/discussions)** | **[Twitter](https://x.com/python_xi)**
+**[Demo original](https://openreel.video)** | **[GitHub del autor](https://github.com/devjaime)** | **[Blog](https://jaimehernandez.dev)**
 
-![OpenReel Editor](https://img.shields.io/badge/Lines%20of%20Code-130k+-blue) ![License](https://img.shields.io/badge/License-MIT-green) ![Status](https://img.shields.io/badge/Status-Beta-orange) ![Open Source](https://img.shields.io/badge/Open%20Source-100%25-brightgreen)
-
----
-
-## Why OpenReel?
-
-- **100% Client-Side** - Your videos never leave your device. No uploads, no cloud processing, complete privacy.
-- **No Installation** - Works in Chrome/Edge. Just open and start editing.
-- **Professional Features** - Multi-track timeline, keyframe animations, color grading, audio effects, and more.
-- **GPU Accelerated** - WebGPU and WebCodecs for smooth 4K editing and fast exports.
-- **Free Forever** - MIT licensed, no subscriptions, no watermarks.
+![License](https://img.shields.io/badge/License-MIT-green)
+![Fork](https://img.shields.io/badge/Fork-OpenReel-blue)
+![AI Features](https://img.shields.io/badge/AI-Whisper%20%2B%20Filler%20Detector-purple)
+![Status](https://img.shields.io/badge/Status-Beta-orange)
 
 ---
 
-## Features
+## Features añadidas en este fork
 
-### Video Editing
-- **Multi-track timeline** - Unlimited video, audio, image, text, and graphics tracks
-- **Real-time preview** - Smooth playback with GPU acceleration
-- **Precision editing** - Frame-accurate scrubbing, cut, trim, split, ripple delete
-- **Transitions** - Crossfade, dip to black/white, wipe, slide effects
-- **Video effects** - Brightness, contrast, saturation, blur, sharpen, glow, vignette, chroma key
-- **Blend modes** - Multiply, screen, overlay, add, subtract, and more
-- **Speed control** - 0.25x to 4x with audio pitch preservation
-- **Crop & transform** - Position, scale, rotation with 3D perspective
+### 🎙️ Auto-subtítulos con Whisper (IA local, sin internet)
 
-### Graphics & Text
-- **Professional text editor** - Rich styling, shadows, outlines, gradients
-- **20+ text animations** - Typewriter, fade, slide, bounce, pop, elastic, glitch
-- **Karaoke-style subtitles** - Word-by-word highlighting synced to audio
-- **Shape tools** - Rectangle, circle, arrow, polygon, star with fill/stroke
-- **SVG support** - Import SVGs with color tinting and animations
-- **Stickers & emoji** - Built-in library
-- **Background generator** - Solid colors, gradients, mesh gradients, patterns
-- **Keyframe animations** - Animate any property over time with 20+ easing curves
+Transcripción automática con timestamps por palabra usando Whisper ONNX ejecutado **100% en el navegador**.
 
-### Audio
-- **Multi-track mixing** - Unlimited audio tracks with real-time mixing
-- **Waveform visualization** - Visual audio editing
-- **Audio effects** - EQ, compressor, reverb, delay, chorus, flanger, distortion
-- **Volume & panning** - Per-clip controls with fade in/out
-- **Beat detection** - Auto-generate markers synced to music
-- **Audio ducking** - Auto-reduce music when dialog plays
-- **Noise reduction** - 3-pass noise removal (tonal, broadband, rumble)
+- 4 modelos (Tiny 39 MB → Large-v3-Turbo 800 MB)
+- 20+ idiomas (español por defecto)
+- Animaciones karaoke, word-by-word, typewriter
+- Sin servidores — modelo cacheado en IndexedDB
+- Panel: `Inspector → Auto-subtítulos IA`
 
-### Color Grading
-- **Color wheels** - Lift, gamma, gain controls
-- **HSL adjustments** - Hue, saturation, lightness fine-tuning
-- **Curves editor** - RGB and individual channel curves
-- **LUT support** - Import and apply 3D LUTs
-- **Built-in presets** - One-click color grading
+### 🔍 Detector de Muletillas en Español
 
-### Export
-- **MP4 (H.264/H.265)** - Universal compatibility
-- **WebM (VP8/VP9/AV1)** - Web-optimized format
-- **ProRes** - Professional intermediate format (Proxy, LT, Standard, HQ, 4444)
-- **Quality presets** - 4K @ 60fps, 1080p, 720p, 480p
-- **Custom settings** - Bitrate, frame rate, codec options, color depth
-- **Hardware encoding** - WebCodecs for fast exports
-- **AI upscaling** - Enhance resolution with WebGPU shaders
-- **Audio export** - MP3, WAV, AAC, FLAC, OGG
-- **Image sequences** - JPG, PNG, WebP frame export
-- **Progress tracking** - Real-time progress with cancel support
+Analiza la transcripción y detecta 4 categorías:
 
-### Professional Tools
-- **Unlimited undo/redo** - Full history with recovery
-- **Auto-save** - Never lose work (IndexedDB storage)
-- **Keyboard shortcuts** - Professional workflow
-- **Snap to grid** - Magnetic alignment
-- **Track management** - Show/hide, lock/unlock, reorder
-- **Subtitle support** - SRT import with customizable styling
-- **Screen recording** - Record screen, camera, or both
-- **Project sharing** - Export/import project files
+| Categoría | Ejemplos | Color |
+|---|---|---|
+| Sonidos | eh, um, mmm, ah, uh | 🔴 Rojo |
+| Frases | "o sea", "digamos", "básicamente" | 🟠 Naranja |
+| Repeticiones | "que que", "pues pues" | 🟣 Violeta |
+| Ambiguas | "entonces", "bueno" (análisis contextual) | 🟡 Amarillo |
 
-### Performance
-- **WebGPU rendering** - GPU-accelerated compositing
-- **WebCodecs API** - Hardware video decoding/encoding
-- **Frame caching** - LRU cache for smooth playback
-- **Web Workers** - Background processing
-- **4K support** - Edit and export in 4K resolution
+Acciones: marcar en timeline, click para navegar, eliminar con ripple-cut, muletillas personalizadas.  
+Panel: `Inspector → Detector de Muletillas`
+
+### 📱 Exportación para Redes Sociales
+
+Selector "Exportar para…" con safe areas, guías de subtítulos y encoding optimizado:
+
+| Plataforma | Resolución | FPS | Aspecto |
+|---|---|---|---|
+| YouTube | 1920×1080 | 30/60 | 16:9 |
+| YouTube Shorts | 1080×1920 | 60 | 9:16 |
+| TikTok | 1080×1920 | 30/60 | 9:16 |
+| Instagram Reels | 1080×1920 | 30 | 9:16 |
+| Instagram Feed | 1080×1080 | 30 | 1:1 |
+| Instagram Story | 1080×1920 | 30 | 9:16 |
+| Twitter/X | 1280×720 | 30 | 16:9 |
+| LinkedIn | 1920×1080 | 30 | 16:9 |
+
+Cada preset incluye overlay SVG de safe area, guía de posición de subtítulos, tips de la plataforma y botón "Adaptar canvas".  
+Panel: `Export Dialog → Exportar para…`
 
 ---
 
-## Quick Start
+## Instalación y ejecución local
 
-### Try Online
-Visit **[openreel.video](https://openreel.video)** to start editing immediately.
+### Requisitos
 
-### Run Locally
+- **Node.js** ≥ 18.0.0
+- **pnpm** ≥ 9.0.0
+- **Chrome o Edge 94+** (necesario para WebCodecs en la exportación)
 
 ```bash
-# Clone the repository
-git clone https://github.com/Augani/openreel-video.git
-cd openreel
+# 1. Instalar pnpm si no lo tienes
+npm install -g pnpm
 
-# Install dependencies (requires Node.js 18+)
+# 2. Clonar el repositorio
+git clone https://github.com/devjaime/videoforge.git
+cd videoforge
+
+# 3. Instalar todas las dependencias del monorepo
 pnpm install
 
-# Start development server
-pnpm dev
+# 4. Compilar los módulos WebAssembly (solo la primera vez)
+pnpm build:wasm
 
-# Open http://localhost:5173
+# 5. Iniciar el servidor de desarrollo
+pnpm dev
 ```
 
-### Build for Production
+Abre **http://localhost:5173** en Chrome o Edge.
+
+> **Nota:** La exportación de video requiere Chrome/Edge 94+ con WebCodecs habilitado.  
+> Los modelos de Whisper se descargan la primera vez que los usas (~39–800 MB según el modelo elegido).
+
+### Build de producción
 
 ```bash
 pnpm build
-pnpm preview
+# Output en apps/web/dist/
 ```
 
----
+### Tests
 
-## Browser Requirements
-
-| Browser | Version | Status |
-|---------|---------|--------|
-| Chrome | 94+ | Full support |
-| Edge | 94+ | Full support |
-| Firefox | 130+ | Full support |
-| Safari | 16.4+ | Full support |
-
-All major browsers now support WebCodecs for hardware-accelerated video encoding/decoding.
-
-**Recommended:**
-- 8GB+ RAM
-- Dedicated GPU for 4K editing
-- Modern multi-core CPU
-
----
-
-## Architecture
-
-### Monorepo Structure
-
-```
-openreel/
-├── apps/web/              # React frontend (~66k lines)
-│   └── src/
-│       ├── components/    # UI components
-│       │   └── editor/    # Editor panels (Timeline, Preview, Inspector)
-│       ├── stores/        # Zustand state management
-│       ├── services/      # Auto-save, shortcuts, screen recording
-│       └── bridges/       # Engine coordination
-│
-└── packages/core/         # Core engines (~59k lines)
-    └── src/
-        ├── video/         # Video processing, WebGPU rendering
-        ├── audio/         # Web Audio API, effects, beat detection
-        ├── graphics/      # Canvas/THREE.js, shapes, SVG
-        ├── text/          # Text rendering, animations
-        ├── export/        # MP4/WebM encoding
-        └── storage/       # IndexedDB, serialization
-```
-
-### Key Technologies
-
-- **React 18** + **TypeScript** - Type-safe UI
-- **Zustand** - Lightweight state management
-- **MediaBunny** - Video/audio processing
-- **WebCodecs** - Hardware encoding/decoding
-- **WebGPU** - GPU-accelerated rendering
-- **Web Audio API** - Professional audio processing
-- **THREE.js** - 3D transforms and effects
-- **IndexedDB** - Local project storage
-
-### Design Principles
-
-- **Action-based editing** - Every edit is an undoable action
-- **Immutable state** - Predictable updates with Zustand
-- **Engine separation** - Video, audio, graphics engines are independent
-- **Progressive enhancement** - Graceful fallbacks (WebGPU → Canvas2D)
-
----
-
-## AI-Managed Development
-
-OpenReel is an experiment in AI-assisted open source development. Claude AI helps manage:
-
-- **Issue triage** - Reviews and responds to issues
-- **Code implementation** - Writes features and fixes bugs
-- **Code review** - Maintains quality standards
-- **Documentation** - Keeps docs up to date
-
-Human oversight from Augustus ensures strategic direction and final approval on major changes. All code is public, tested, and follows best practices.
-
-**What this means for contributors:**
-- Issues get reviewed quickly (usually within 24 hours)
-- Bug fixes ship fast
-- Clear, detailed responses to questions
-- High code quality standards
-
----
-
-## Contributing
-
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-**Ways to contribute:**
-- Report bugs with reproduction steps
-- Suggest features in Discussions
-- Submit PRs for bugs or features
-- Improve documentation
-- Write tests
-- Share effect presets
-
-**Development workflow:**
 ```bash
-# Fork and clone
-git clone https://github.com/Augani/openreel-video.git
-
-# Create feature branch
-git checkout -b feat/your-feature
-
-# Make changes, then test
-pnpm typecheck
+# Todos los tests del monorepo
 pnpm test
-pnpm lint
 
-# Commit with conventional commits
-git commit -m "feat: add your feature"
-
-# Push and open PR
-git push origin feat/your-feature
+# Solo el core (incluye los 51 tests del detector de muletillas)
+pnpm --filter @openreel/core test:run -- --reporter=verbose
 ```
 
 ---
 
-## Roadmap
+## Estructura del proyecto
 
-### Completed
-- Multi-track timeline with drag-and-drop
-- Real-time video preview with GPU acceleration
-- Full editing suite (cut, trim, split, transitions)
-- Text editor with 20+ animations
-- Graphics (shapes, SVG, stickers, backgrounds)
-- Audio mixing with effects and beat detection
-- Color grading with LUT support
-- Keyframe animation system
-- Export to MP4/WebM (4K supported)
-- Screen recording
-- AI upscaling
-- Undo/redo with auto-save
-
-### In Progress
-- Nested sequences (timeline in timeline)
-- Motion tracking
-- More export formats (ProRes, GIF)
-- Plugin system
-
-### Planned
-- Adjustment layers
-- Advanced masking
-- Audio spectral editing
-- Collaborative editing
-- Mobile optimization
-
----
-
-## License
-
-MIT License - Use freely for personal and commercial projects.
-
-See [LICENSE](LICENSE) for details.
+```
+videoforge/
+├── apps/
+│   └── web/                          ← Editor (React 18 + Zustand + Vite 5)
+│       ├── src/
+│       │   ├── components/editor/
+│       │   │   ├── inspector/
+│       │   │   │   ├── WhisperSubtitlePanel.tsx   ← Auto-subtítulos UI
+│       │   │   │   └── FillerDetectorPanel.tsx    ← Detector muletillas UI
+│       │   │   ├── SafeAreaOverlay.tsx            ← Overlay SVG plataformas
+│       │   │   ├── SocialExportSelector.tsx       ← "Exportar para…" UI
+│       │   │   └── ExportDialog.tsx               ← Diálogo export (modificado)
+│       │   └── workers/
+│       │       └── whisper.worker.ts              ← Web Worker Whisper
+│       └── public/
+└── packages/
+    ├── core/                         ← @openreel/core (sin React)
+    │   └── src/
+    │       ├── audio/
+    │       │   ├── whisper/          ← LocalWhisperEngine
+    │       │   └── filler-detector.ts
+    │       └── export/
+    │           └── social-presets.ts ← Safe areas + specs por plataforma
+    └── ui/                           ← @openreel/ui (Radix + shadcn)
+```
 
 ---
 
-## Acknowledgments
+## Features del proyecto base (OpenReel)
 
-**Built with:**
-- [MediaBunny](https://mediabunny.dev) - Media processing
-- [React](https://react.dev) - UI framework
-- [Zustand](https://zustand-demo.pmnd.rs/) - State management
-- [THREE.js](https://threejs.org) - 3D rendering
-- [TailwindCSS](https://tailwindcss.com) - Styling
-
-**Inspired by:**
-- DaVinci Resolve - Professional tools done right
-- CapCut - Accessible editing for everyone
-- Figma - Browser-based professional software
+- **Timeline multi-track** — video, audio, imagen, texto, gráficos
+- **Preview GPU** — WebGPU con fallback Canvas 2D
+- **Color grading** — ruedas de color, HSL, curvas RGB, LUTs
+- **Efectos de audio** — EQ, compresión, reverb, noise reduction
+- **Exportación** — MP4, WebM, MOV, ProRes; hasta 4K con hardware encoding
+- **Keyframe animations** — 35+ curvas de easing
+- **Karaoke subtitles** — word-level sync
+- Ver el [README original](https://github.com/Augani/openreel-video) para la lista completa
 
 ---
 
-## Support
+## Tecnologías
 
-- **GitHub Issues** - Bug reports and feature requests
-- **GitHub Discussions** - Questions and community chat
-- **Twitter/X** - [@python_xi](https://x.com/python_xi)
+| Stack | Versión |
+|---|---|
+| React | 18.3.1 |
+| TypeScript | 5.4.5 (strict) |
+| Vite | 5.3.1 |
+| Zustand | 4.5.2 |
+| @huggingface/transformers | 3.5.2 |
+| WebCodecs API | Chrome 94+ |
+| WebGPU API | Chrome 113+ |
+| pnpm workspaces | 9.0.0 |
 
 ---
 
-**Built with care by [@python_xi](https://x.com/python_xi) and AI working together.**
+## Créditos y Licencia
 
-*Making professional video editing accessible to everyone. Forever free. Forever open source.*
+Este proyecto es un fork de **[OpenReel Video](https://github.com/Augani/openreel-video)**, creado por [Augustus Otu](https://github.com/Augani) y contribuidores.
+
+Las features de IA (Whisper, detector de muletillas) y exportación social fueron desarrolladas por **[devjaime](https://github.com/devjaime)**.
+
+**Licencia: MIT** — ver [LICENSE](LICENSE)
+
+---
+
+## Contacto
+
+**Jaime Hernández**
+
+- 🐙 GitHub: [@devjaime](https://github.com/devjaime)
+- 🌐 Blog: [jaimehernandez.dev](https://jaimehernandez.dev)
+
+---
+
+*Built by devjaime · Powered by [OpenReel](https://github.com/Augani/openreel-video)*

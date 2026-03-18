@@ -1,8 +1,8 @@
 {
-  "name": "openreel",
-  "version": "0.1.0",
+  "name": "videoforge",
+  "version": "0.2.0",
   "private": true,
-  "description": "Professional video, audio, and photo editing in your browser",
+  "description": "VideoForge — Editor de video profesional en el navegador con IA. Fork de OpenReel con auto-subtítulos Whisper, detector de muletillas y presets para redes sociales.",
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter @openreel/web dev",
@@ -32,9 +32,14 @@
     "video-editing",
     "timeline",
     "color-grading",
-    "export"
+    "export",
+    "ai",
+    "whisper",
+    "social-media",
+    "filler-words",
+    "videoforge"
   ],
-  "author": "Augustus Otu and Contributors",
+  "author": "devjaime <github.com/devjaime>",
   "license": "MIT",
   "repository": {
     "type": "git",

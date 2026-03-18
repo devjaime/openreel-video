@@ -1,5 +1,14 @@
+/**
+ * AutoCaptionPanel
+ *
+ * Two-tab panel for generating captions / subtitles:
+ *
+ *   Tab 1 – "Micrófono"  (live Web Speech API transcription)
+ *   Tab 2 – "Video IA"   (Whisper ONNX, 100% browser, from a selected clip)
+ */
+
 import React, { useState, useCallback, useMemo } from "react";
-import { Mic, MicOff, Languages, AlertCircle } from "lucide-react";
+import { Mic, MicOff, Languages, AlertCircle, Sparkles } from "lucide-react";
 import { useEngineStore } from "../../../stores/engine-store";
 import { useProjectStore } from "../../../stores/project-store";
 import { SpeechToTextEngine } from "@openreel/core";
@@ -14,6 +23,11 @@ import {
   SelectContent,
   SelectItem,
 } from "@openreel/ui";
+import { WhisperSubtitlePanel } from "./WhisperSubtitlePanel";
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
 const CAPTION_STYLE_PRESETS = [
   {
@@ -27,7 +41,50 @@ const CAPTION_STYLE_PRESETS = [
   { id: "minimal", name: "Minimal", description: "Subtle, understated" },
 ];
 
-export const AutoCaptionPanel: React.FC = () => {
+type TabId = "mic" | "whisper";
+
+// ---------------------------------------------------------------------------
+// Tab button
+// ---------------------------------------------------------------------------
+
+interface TabButtonProps {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  badge?: string;
+}
+
+function TabButton({ active, onClick, icon, label, badge }: TabButtonProps) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded text-[10px] font-medium transition-colors ${
+        active
+          ? "bg-primary text-white"
+          : "text-text-secondary hover:text-text-primary hover:bg-background-secondary"
+      }`}
+    >
+      {icon}
+      {label}
+      {badge && (
+        <span
+          className={`text-[8px] px-1 rounded-full ${
+            active ? "bg-white/20 text-white" : "bg-primary/20 text-primary"
+          }`}
+        >
+          {badge}
+        </span>
+      )}
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Live microphone tab (extracted from original AutoCaptionPanel)
+// ---------------------------------------------------------------------------
+
+const LiveMicTab: React.FC = () => {
   const getSpeechToTextEngine = useEngineStore(
     (state) => state.getSpeechToTextEngine,
   );
@@ -140,18 +197,6 @@ export const AutoCaptionPanel: React.FC = () => {
 
   return (
     <div className="space-y-4 w-full min-w-0 max-w-full">
-      <div className="flex items-center gap-2 p-2 bg-primary/10 rounded-lg border border-primary/30">
-        <Mic size={16} className="text-primary" />
-        <div>
-          <span className="text-[11px] font-medium text-text-primary">
-            Auto-Caption
-          </span>
-          <p className="text-[9px] text-text-muted">
-            Generate captions from speech
-          </p>
-        </div>
-      </div>
-
       <div className="space-y-3 p-3 bg-background-tertiary rounded-lg">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -279,6 +324,38 @@ export const AutoCaptionPanel: React.FC = () => {
         Speak clearly into your microphone. Captions will be generated in
         real-time.
       </p>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// AutoCaptionPanel — tabbed wrapper
+// ---------------------------------------------------------------------------
+
+export const AutoCaptionPanel: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<TabId>("whisper");
+
+  return (
+    <div className="space-y-3 w-full min-w-0 max-w-full">
+      {/* Tab bar */}
+      <div className="flex gap-1 p-1 bg-background-tertiary rounded-lg">
+        <TabButton
+          active={activeTab === "whisper"}
+          onClick={() => setActiveTab("whisper")}
+          icon={<Sparkles size={11} />}
+          label="Video IA"
+          badge="nuevo"
+        />
+        <TabButton
+          active={activeTab === "mic"}
+          onClick={() => setActiveTab("mic")}
+          icon={<Mic size={11} />}
+          label="Micrófono"
+        />
+      </div>
+
+      {/* Tab content */}
+      {activeTab === "whisper" ? <WhisperSubtitlePanel /> : <LiveMicTab />}
     </div>
   );
 };

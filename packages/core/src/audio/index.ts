@@ -10,3 +10,5 @@ export * from "./effects-worklet-processor";
 export * from "./sound-library-engine";
 export * from "./sound-generator";
 export * from "./beat-detection-engine";
+export * from "./whisper";
+export * from "./filler-detector";

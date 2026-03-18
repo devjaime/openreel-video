@@ -92,7 +92,7 @@ export const Toolbar: React.FC = () => {
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [isRecorderOpen, setIsRecorderOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const { importMedia } = useProjectStore();
+  const { importMedia, updateSettings: updateProjectSettings } = useProjectStore();
   const { track } = useAnalytics();
 
   const handleStartTour = useCallback(() => {
@@ -995,6 +995,9 @@ export const Toolbar: React.FC = () => {
         isOpen={isExportDialogOpen}
         onClose={() => setIsExportDialogOpen(false)}
         onExport={handleCustomExport}
+        onAdaptCanvas={(w, h, fps) => {
+          updateProjectSettings({ width: w, height: h, frameRate: fps });
+        }}
         duration={project.timeline?.duration ?? 0}
         projectWidth={project.settings?.width ?? 1920}
         projectHeight={project.settings?.height ?? 1080}

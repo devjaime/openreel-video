@@ -1,7 +1,7 @@
 {
-  "name": "OpenReel",
-  "short_name": "OpenReel",
-  "description": "Professional browser-based video, audio, and photo editing application",
+  "name": "VideoForge",
+  "short_name": "VideoForge",
+  "description": "Editor de video profesional en el navegador con IA. Fork de OpenReel por devjaime.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",
