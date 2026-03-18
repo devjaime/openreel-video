@@ -307,52 +307,65 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
           setProgress("thumbnail-generation", 0.1);
 
           let imgDataUrl: string | undefined;
-          let imgError: string | undefined;
+          let usedProvider = "";
 
+          // Helper: try Google AI image generation
+          const tryGoogle = async (basePrompt: string): Promise<string | undefined> => {
+            const gc = getGoogleAiClient();
+            if (!gc) return undefined;
+            try {
+              const conceptRes = await gc.generateText(basePrompt);
+              const finalPrompt = conceptRes.success && conceptRes.text ? conceptRes.text : basePrompt;
+              const imgRes = await gc.generateImage(finalPrompt, { aspectRatio: "16:9" });
+              if (imgRes.success && imgRes.dataUrl) {
+                usedProvider = "Gemini (Google)";
+                return imgRes.dataUrl;
+              }
+            } catch { /* fall through */ }
+            return undefined;
+          };
+
+          // Helper: try OpenRouter DALL-E 3 image generation
+          const tryOpenRouter = async (basePrompt: string): Promise<string | undefined> => {
+            const oc = getOpenRouterClient();
+            if (!oc) return undefined;
+            try {
+              const conceptRes = await oc.ask(basePrompt);
+              const finalPrompt = conceptRes.success && conceptRes.text ? conceptRes.text : basePrompt;
+              const imgRes = await oc.generateImage(finalPrompt, { size: "1792x1024", quality: "standard" });
+              if (imgRes.success && imgRes.dataUrl) {
+                usedProvider = "DALL-E 3 (OpenRouter)";
+                return imgRes.dataUrl;
+              }
+            } catch { /* fall through */ }
+            return undefined;
+          };
+
+          setProgress("thumbnail-generation", 0.2);
+
+          // Try primary provider, then the other, then skip gracefully
           if (activeProvider === "google") {
-            // ── Google: Gemini text → Imagen 3 image ─────────────────────────
-            const gc = getGoogleAiClient()!;
-
-            // 1. Improve prompt with Gemini
-            const conceptRes = await gc.generateText(prompt);
-            setProgress("thumbnail-generation", 0.35);
-
-            const finalPrompt =
-              conceptRes.success && conceptRes.text ? conceptRes.text : prompt;
-
-            // 2. Generate image with Imagen 3 (falls back to Gemini 2.0 image-gen)
-            const imgRes = await gc.generateImage(finalPrompt, {
-              aspectRatio: "16:9",
-            });
-            imgDataUrl = imgRes.dataUrl;
-            imgError = imgRes.error;
+            imgDataUrl = await tryGoogle(prompt);
+            if (!imgDataUrl) {
+              setProgress("thumbnail-generation", 0.5);
+              imgDataUrl = await tryOpenRouter(prompt);
+            }
           } else {
-            // ── OpenRouter: GPT-4o → DALL-E 3 ────────────────────────────────
-            const oc = getOpenRouterClient()!;
-            const conceptRes = await oc.ask(prompt);
-            setProgress("thumbnail-generation", 0.35);
-
-            const finalPrompt =
-              conceptRes.success && conceptRes.text ? conceptRes.text : prompt;
-
-            const imgRes = await oc.generateImage(finalPrompt, {
-              size: "1792x1024",
-              quality: "standard",
-            });
-            imgDataUrl = imgRes.dataUrl;
-            imgError = imgRes.error;
+            imgDataUrl = await tryOpenRouter(prompt);
+            if (!imgDataUrl) {
+              setProgress("thumbnail-generation", 0.5);
+              imgDataUrl = await tryGoogle(prompt);
+            }
           }
 
           setProgress("thumbnail-generation", 1.0);
 
           if (imgDataUrl) {
             store()._setThumbnail(imgDataUrl);
-            const providerLabel = activeProvider === "google"
-              ? "Imagen 3 (Google)"
-              : "DALL-E 3 (OpenRouter)";
-            setDone("thumbnail-generation", `Generada con ${providerLabel} — descarga abajo`);
+            setDone("thumbnail-generation", `Generada con ${usedProvider} — descarga abajo`);
           } else {
-            setError("thumbnail-generation", imgError ?? "No se pudo generar la imagen");
+            // Skip gracefully — don't block the rest of the pipeline
+            setSkipped("thumbnail-generation", "No se pudo generar miniatura (continúa con la exportación)");
           }
         } catch (e) {
           setError("thumbnail-generation", errMsg(e));
