@@ -229,7 +229,7 @@ const SafeAreaPreview: React.FC<{ spec: SocialPlatformSpec }> = ({ spec }) => {
       <div className="flex items-center gap-3 text-[9px] text-text-muted">
         <span className="flex items-center gap-1">
           <span className="inline-block w-3 h-0.5 bg-green-500 opacity-80 rounded" />
-          Safe zone
+          Zona segura
         </span>
         <span className="flex items-center gap-1">
           <span className="inline-block w-3 h-0.5 bg-blue-400 opacity-80 rounded" />

@@ -293,12 +293,12 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[85vh] p-0 gap-0 bg-background-secondary border-border overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl h-[85vh] min-h-[560px] p-0 gap-0 bg-background-secondary border-border overflow-hidden flex flex-col">
         <DialogHeader className="p-4 border-b border-border bg-background-tertiary space-y-0">
           <div className="flex items-center gap-3">
             <Download size={20} className="text-primary" />
             <DialogTitle className="text-lg font-bold text-text-primary">
-              Export Video
+              Exportar vídeo
             </DialogTitle>
           </div>
         </DialogHeader>
@@ -328,20 +328,24 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
               className="flex-1 flex items-center justify-center gap-2 p-3 text-sm font-medium rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary text-text-secondary hover:text-text-primary"
             >
               <Settings size={16} />
-              Custom
+              Avanzado
             </TabsTrigger>
           </TabsList>
 
           {/* ── Social "Exportar para…" tab ────────────────────────────────── */}
-          <TabsContent value="social" className="flex-1 overflow-hidden flex flex-col mt-0 p-4">
-            <SocialExportSelector
-              onApply={handleSocialExport}
-              onAdaptCanvas={handleAdaptCanvas}
-              projectWidth={projectWidth}
-              projectHeight={projectHeight}
-              duration={duration}
-            />
-          </TabsContent>
+          {/* Social tab rendered outside Radix TabsContent to avoid Presence/present=false issue */}
+          {activeTab === "social" && (
+            <div className="flex-1 overflow-hidden flex flex-col p-4 min-h-0">
+              <SocialExportSelector
+                onApply={handleSocialExport}
+                onAdaptCanvas={handleAdaptCanvas}
+                projectWidth={projectWidth}
+                projectHeight={projectHeight}
+                duration={duration}
+              />
+            </div>
+          )}
+          <TabsContent value="social" className="hidden" />
 
           <TabsContent value="presets" className="flex-1 overflow-hidden flex mt-0">
               <div className="w-48 border-r border-border overflow-y-auto">
@@ -889,7 +893,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={onClose}>
-              Cancel
+              Cancelar
             </Button>
             {activeTab !== "social" && (
               <Button
@@ -897,7 +901,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
                 disabled={activeTab === "presets" && !selectedPreset}
               >
                 <Play size={16} />
-                Start Export
+                Iniciar exportación
               </Button>
             )}
           </div>
