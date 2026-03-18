@@ -44,3 +44,4 @@ export * from "./adjustment-layer-engine";
 
 // Upscaling
 export * from "./upscaling";
+export * from "./reels-cutter";

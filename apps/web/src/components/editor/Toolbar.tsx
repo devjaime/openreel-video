@@ -21,6 +21,7 @@ import {
   Diamond,
   Sparkles,
   Play,
+  Wand2,
 } from "lucide-react";
 import { useProjectStore } from "../../stores/project-store";
 import { useUIStore } from "../../stores/ui-store";
@@ -39,6 +40,8 @@ import {
 import { ExportDialog } from "./ExportDialog";
 import { ScreenRecorder } from "./ScreenRecorder";
 import { HistoryPanel } from "./inspector/HistoryPanel";
+import { MagicPipelinePanel } from "./MagicPipelinePanel";
+import { useMagicPipelineStore } from "../../stores/magic-pipeline-store";
 import { ProjectSwitcher } from "./ProjectSwitcher";
 import { toast } from "../../stores/notification-store";
 import { useAnalytics, AnalyticsEvents } from "../../hooks/useAnalytics";
@@ -92,6 +95,7 @@ export const Toolbar: React.FC = () => {
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [isRecorderOpen, setIsRecorderOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const { togglePanel: toggleMagicPanel, status: pipelineStatus } = useMagicPipelineStore();
   const { importMedia, updateSettings: updateProjectSettings } = useProjectStore();
   const { track } = useAnalytics();
 
@@ -839,6 +843,27 @@ export const Toolbar: React.FC = () => {
         <Tooltip>
           <TooltipTrigger asChild>
             <button
+              onClick={toggleMagicPanel}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all font-medium text-sm ${
+                pipelineStatus === "running"
+                  ? "bg-purple-500/20 text-purple-300 border border-purple-500/40 animate-pulse"
+                  : pipelineStatus === "done"
+                    ? "bg-green-500/10 text-green-400 border border-green-500/30"
+                    : "bg-gradient-to-r from-purple-500/10 to-pink-500/10 hover:from-purple-500/20 hover:to-pink-500/20 text-purple-400 border border-purple-500/20 hover:border-purple-500/40"
+              }`}
+            >
+              <Wand2 size={14} />
+              <span>Publicar</span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Pipeline completo: audio · transcripción · reels · miniatura · redes</p>
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
               onClick={() => setIsRecorderOpen(true)}
               className="flex items-center gap-2 px-3 py-2 bg-error/10 hover:bg-error/20 text-error rounded-lg transition-colors"
             >
@@ -1008,6 +1033,8 @@ export const Toolbar: React.FC = () => {
         onClose={() => setIsRecorderOpen(false)}
         onRecordingComplete={handleRecordingComplete}
       />
+
+      <MagicPipelinePanel />
 
       {isHistoryOpen && (
         <>
