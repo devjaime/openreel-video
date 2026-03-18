@@ -50,6 +50,7 @@ export { AudioDuckingSection } from "./AudioDuckingSection";
 export { AutoCutSilenceSection } from "./AutoCutSilenceSection";
 export { MusicLibraryPanel } from "./MusicLibraryPanel";
 export { TextToSpeechPanel } from "./TextToSpeechPanel";
+export { StemSeparatorSection } from "./StemSeparatorSection";
 
 // Transitions & Keyframes
 export { TransitionInspector } from "./TransitionInspector";

@@ -46,6 +46,7 @@ import {
   ParticleEffectsSection,
   AudioTextSyncPanel,
   AlignmentSection,
+  StemSeparatorSection,
 } from "./inspector";
 import {
   getAudioBridgeEffects,
@@ -1112,6 +1113,16 @@ export const InspectorPanel: React.FC = () => {
                 defaultOpen={false}
               >
                 <AudioDuckingSection clipId={clipId} />
+              </Section>
+            )}
+
+            {showAudioEffects && (
+              <Section
+                title="Separación de Stems"
+                sectionId="stem-separator"
+                defaultOpen={false}
+              >
+                <StemSeparatorSection />
               </Section>
             )}
 

@@ -12,3 +12,4 @@ export * from "./sound-generator";
 export * from "./beat-detection-engine";
 export * from "./whisper";
 export * from "./filler-detector";
+export * from "./stem-separator";
