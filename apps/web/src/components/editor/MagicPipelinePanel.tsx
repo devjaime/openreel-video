@@ -49,7 +49,7 @@ const StepCard: React.FC<{ step: PipelineStep; onToggle: () => void }> = ({
     pending: "text-text-muted border-border/30",
     running: "text-blue-300 border-blue-500/30 bg-blue-500/5",
     done: "text-green-300 border-green-500/30 bg-green-500/5",
-    skipped: "text-text-muted/50 border-border/20",
+    skipped: "text-slate-400 border-slate-500/30 bg-slate-500/5",
     error: "text-red-300 border-red-500/30 bg-red-500/5",
   } as const;
 
@@ -57,7 +57,7 @@ const StepCard: React.FC<{ step: PipelineStep; onToggle: () => void }> = ({
     pending: <div className="w-4 h-4 rounded-full border border-current opacity-40" />,
     running: <Loader2 className="w-4 h-4 animate-spin text-blue-400" />,
     done: <Check className="w-4 h-4 text-green-400" />,
-    skipped: <div className="w-4 h-4 rounded-full border border-current opacity-20" />,
+    skipped: <Check className="w-4 h-4 text-slate-400 opacity-70" />,
     error: <AlertTriangle className="w-4 h-4 text-red-400" />,
   } as const;
 

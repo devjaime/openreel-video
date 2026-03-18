@@ -28,7 +28,67 @@ import {
   type PipelineStepId,
 } from "../stores/magic-pipeline-store";
 import { useProjectStore } from "../stores/project-store";
+import { useEngineStore } from "../stores/engine-store";
 import { toast } from "../stores/notification-store";
+
+// ──────────────────────────────────────────────────────────────────────────────
+// In-memory writable stream → auto-downloads as a file when .close() is called
+// (mirrors the fallback logic in Toolbar.tsx for browsers without showSaveFilePicker)
+// ──────────────────────────────────────────────────────────────────────────────
+function createDownloadStream(filename: string, mime: string): FileSystemWritableFileStream {
+  let buffer = new Uint8Array(32 * 1024 * 1024); // 32 MB initial
+  let length = 0;
+  let cursor = 0;
+
+  const grow = (needed: number) => {
+    if (needed <= buffer.length) return;
+    let newSize = buffer.length;
+    while (newSize < needed) newSize *= 2;
+    const next = new Uint8Array(newSize);
+    next.set(buffer.subarray(0, length));
+    buffer = next;
+  };
+
+  const writeBytes = (bytes: Uint8Array, position: number) => {
+    const end = position + bytes.byteLength;
+    grow(end);
+    buffer.set(bytes, position);
+    if (end > length) length = end;
+    cursor = end;
+  };
+
+  return {
+    seek(position: number) {
+      cursor = position;
+      return Promise.resolve();
+    },
+    write(data: unknown) {
+      if (data instanceof ArrayBuffer) {
+        writeBytes(new Uint8Array(data), cursor);
+      } else if (ArrayBuffer.isView(data)) {
+        writeBytes(new Uint8Array(data.buffer as ArrayBuffer, data.byteOffset, data.byteLength), cursor);
+      }
+      return Promise.resolve();
+    },
+    close() {
+      const blob = new Blob([buffer.slice(0, length)], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      return Promise.resolve();
+    },
+    abort() { return Promise.resolve(); },
+    truncate(size: number) {
+      if (size < length) length = size;
+      return Promise.resolve();
+    },
+  } as unknown as FileSystemWritableFileStream;
+}
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -146,11 +206,34 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
     if (isEnabled("silence-trimming")) {
       setRunning("silence-trimming");
       try {
-        // Silence trimming is timeline-level; for pipeline we just mark it done
-        // The actual cut logic would require bridge access — stub with advisory
-        setProgress("silence-trimming", 0.5);
-        await sleep(300); // simulate analysis
-        setDone("silence-trimming", "Usa 'Auto-Cortar Silencios' en el inspector para aplicar");
+        const targetBuf = voiceBuffer ?? (await getFirstAudioBuffer(audioCtx));
+        if (!targetBuf) {
+          setSkipped("silence-trimming", "Sin audio — importa un video primero");
+        } else {
+          // Detect silence regions (threshold -40 dBFS, min 0.5 s)
+          setProgress("silence-trimming", 0.3);
+          const data = targetBuf.getChannelData(0);
+          const sr = targetBuf.sampleRate;
+          const threshold = 0.006; // ≈ -44 dBFS
+          const minSilenceSamples = Math.floor(0.5 * sr);
+          let silenceCount = 0;
+          let inSilence = false;
+          let silenceStart = 0;
+          for (let i = 0; i < data.length; i++) {
+            const isSilent = Math.abs(data[i]) < threshold;
+            if (isSilent && !inSilence) { inSilence = true; silenceStart = i; }
+            else if (!isSilent && inSilence) {
+              if (i - silenceStart >= minSilenceSamples) silenceCount++;
+              inSilence = false;
+            }
+          }
+          setProgress("silence-trimming", 1.0);
+          if (silenceCount > 0) {
+            setDone("silence-trimming", `${silenceCount} silencios detectados — aplica 'Auto-Cortar Silencios' en el inspector`);
+          } else {
+            setDone("silence-trimming", "Sin silencios largos detectados");
+          }
+        }
       } catch (e) {
         setError("silence-trimming", errMsg(e));
       }
@@ -273,15 +356,20 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
         }
 
         setProgress("reels-cutting", 1.0);
-        store()._setReelsCuts(
-          cuts.map((c) => ({
-            title: c.title,
-            startTime: c.startTime,
-            endTime: c.endTime,
-            score: c.score,
-          })),
-        );
-        setDone("reels-cutting", `${cuts.length} reels identificados`);
+
+        if (cuts.length === 0) {
+          setSkipped("reels-cutting", "Sin transcripción — transcribe primero para identificar los mejores momentos");
+        } else {
+          store()._setReelsCuts(
+            cuts.map((c) => ({
+              title: c.title,
+              startTime: c.startTime,
+              endTime: c.endTime,
+              score: c.score,
+            })),
+          );
+          setDone("reels-cutting", `${cuts.length} reel${cuts.length > 1 ? "s" : ""} identificado${cuts.length > 1 ? "s" : ""}`);
+        }
       } catch (e) {
         setError("reels-cutting", errMsg(e));
       }
@@ -377,7 +465,7 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
 
     if (shouldAbort()) return finishAborted();
 
-    // ── Step 9: Export packages ───────────────────────────────────────────────
+    // ── Step 9: Export packages — genera y descarga un MP4 por plataforma ────
     if (isEnabled("export-packages")) {
       setRunning("export-packages");
       try {
@@ -388,16 +476,66 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
         if (platforms.length === 0) {
           setSkipped("export-packages", "Sin plataformas seleccionadas");
         } else {
-          setProgress("export-packages", 0.5);
-          // Export packages are triggered via ExportDialog / SocialExportSelector
-          // Here we just record the intent and inform the user
-          const names = platforms
-            .map((id) => SOCIAL_PLATFORM_SPECS[id]?.name ?? id)
-            .join(", ");
-          setDone(
-            "export-packages",
-            `Listo para exportar a: ${names} — usa el botón EXPORT para generar los archivos`,
-          );
+          const exportEngine = useEngineStore.getState().getExportEngine();
+          if (!exportEngine) {
+            setError("export-packages", "Motor de exportación no inicializado — abre el editor primero");
+          } else {
+            await exportEngine.initialize();
+            const proj = project();
+            const projectName = (proj.name || "VideoForge").replace(/\s+/g, "_");
+            const exported: string[] = [];
+            const failed: string[] = [];
+
+            for (let i = 0; i < platforms.length; i++) {
+              if (shouldAbort()) break;
+              const id = platforms[i];
+              const spec = SOCIAL_PLATFORM_SPECS[id];
+              if (!spec) continue;
+
+              setProgress("export-packages", i / platforms.length);
+              store()._setStepDetail("export-packages", `Exportando ${spec.name} (${i + 1}/${platforms.length})…`);
+
+              try {
+                const filename = `${projectName}_${id}.mp4`;
+                const writable = createDownloadStream(filename, "video/mp4");
+
+                const videoSettings = {
+                  format: "mp4" as const,
+                  codec: "h264" as const,
+                  width: spec.width,
+                  height: spec.height,
+                  frameRate: spec.frameRate,
+                  bitrate: spec.encoding.bitrate,
+                };
+
+                const generator = exportEngine.exportVideo(proj, videoSettings, writable);
+                while (true) {
+                  const { done } = await generator.next();
+                  if (done) break;
+                }
+                await writable.close();
+                exported.push(spec.name);
+              } catch (e) {
+                failed.push(`${spec.name}: ${errMsg(e)}`);
+              }
+            }
+
+            setProgress("export-packages", 1.0);
+
+            if (exported.length > 0 && failed.length === 0) {
+              setDone(
+                "export-packages",
+                `✅ Descargados: ${exported.join(", ")}`,
+              );
+            } else if (exported.length > 0) {
+              setDone(
+                "export-packages",
+                `Descargados: ${exported.join(", ")}. Fallidos: ${failed.join("; ")}`,
+              );
+            } else {
+              setError("export-packages", `No se pudo exportar: ${failed.join("; ")}`);
+            }
+          }
         }
       } catch (e) {
         setError("export-packages", errMsg(e));
@@ -407,13 +545,16 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
     }
 
     // ── Finish ────────────────────────────────────────────────────────────────
+    // Only "error" status counts as failure — "skipped" is an expected outcome
     const hasErrors = store().steps.some((s) => s.status === "error");
+    const doneCount = store().steps.filter((s) => s.status === "done").length;
+    const skippedCount = store().steps.filter((s) => s.status === "skipped").length;
     store()._finishPipeline(hasErrors ? "error" : "done");
 
     if (!hasErrors) {
       toast.success(
         "¡Pipeline completado! 🎉",
-        "Tu contenido está listo para publicar en redes.",
+        `${doneCount} paso${doneCount !== 1 ? "s" : ""} completado${doneCount !== 1 ? "s" : ""}${skippedCount > 0 ? `, ${skippedCount} omitido${skippedCount !== 1 ? "s" : ""}` : ""}.`,
       );
     } else {
       toast.warning(

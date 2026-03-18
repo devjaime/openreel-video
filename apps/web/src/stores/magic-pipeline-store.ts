@@ -204,6 +204,7 @@ interface MagicPipelineState {
   // Called by magic-pipeline-runner
   _startPipeline: () => void;
   _setStepStatus: (id: PipelineStepId, status: PipelineStepStatus, detail?: string | null) => void;
+  _setStepDetail: (id: PipelineStepId, detail: string) => void;
   _setStepProgress: (id: PipelineStepId, progress: number) => void;
   _setStepError: (id: PipelineStepId, error: string) => void;
   _finishPipeline: (status: PipelineStatus) => void;
@@ -257,6 +258,13 @@ export const useMagicPipelineStore = create<MagicPipelineState>((set, get) => ({
     set((s) => ({
       steps: s.steps.map((step) =>
         step.id === id ? { ...step, status, detail: detail ?? step.detail } : step,
+      ),
+    })),
+
+  _setStepDetail: (id, detail) =>
+    set((s) => ({
+      steps: s.steps.map((step) =>
+        step.id === id ? { ...step, detail } : step,
       ),
     })),
 
