@@ -14,11 +14,13 @@ import {
   cutReels,
   mergeAiHighlights,
   getOpenRouterClient,
-  getStoredApiKey,
   buildThumbnailPrompt,
   buildHighlightsPrompt,
   SOCIAL_PLATFORM_SPECS,
   type SocialPlatformId,
+  // Google AI
+  getGoogleAiClient,
+  getActiveAiProvider,
 } from "@openreel/core";
 import {
   useMagicPipelineStore,
@@ -81,7 +83,8 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
   let voiceBuffer: AudioBuffer | null = null;
   let transcriptText = "";
   let transcriptSegments: Array<{ startTime: number; endTime: number; text: string }> = [];
-  const hasApiKey = !!getStoredApiKey();
+  const activeProvider = getActiveAiProvider(); // "google" | "openrouter" | null
+  const hasApiKey = !!activeProvider;
 
   try {
     // ── Step 1: Stem separation ───────────────────────────────────────────────
@@ -250,17 +253,20 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
           maxResults: config.reelsCount,
         });
 
-        // If API key available, try to improve with AI
+        // If AI available, try to improve with smart highlights
         if (hasApiKey && transcriptText.length > 50) {
           try {
-            const client = getOpenRouterClient()!;
-            const aiResult = await client.ask(
-              buildHighlightsPrompt(transcriptText),
-              "openai/gpt-4o-mini",
-            );
-            if (aiResult.success && aiResult.text) {
-              cuts = mergeAiHighlights(cuts, aiResult.text, totalDuration);
+            let aiText: string | undefined;
+            if (activeProvider === "google") {
+              const gc = getGoogleAiClient()!;
+              const r = await gc.generateText(buildHighlightsPrompt(transcriptText));
+              aiText = r.text;
+            } else {
+              const oc = getOpenRouterClient()!;
+              const r = await oc.ask(buildHighlightsPrompt(transcriptText), "openai/gpt-4o-mini");
+              aiText = r.text;
             }
+            if (aiText) cuts = mergeAiHighlights(cuts, aiText, totalDuration);
           } catch {
             // AI enhancement failed — keep heuristic cuts
           }
@@ -288,46 +294,65 @@ export async function runMagicPipeline(config: PipelineConfig): Promise<void> {
     // ── Step 8: Thumbnail generation ─────────────────────────────────────────
     if (isEnabled("thumbnail-generation")) {
       if (!hasApiKey && config.skipStepsIfNoApiKey) {
-        setSkipped("thumbnail-generation", "Requiere clave OpenRouter");
+        setSkipped("thumbnail-generation", "Requiere clave de IA (Google AI o OpenRouter)");
       } else {
         setRunning("thumbnail-generation");
         try {
-          const client = getOpenRouterClient();
-          if (!client) {
-            setSkipped("thumbnail-generation", "Sin clave API — configura OpenRouter");
+          const prompt = buildThumbnailPrompt(
+            transcriptText || "Video profesional",
+            project().name || "VideoForge",
+            config.thumbnailStyle,
+          );
+
+          setProgress("thumbnail-generation", 0.1);
+
+          let imgDataUrl: string | undefined;
+          let imgError: string | undefined;
+
+          if (activeProvider === "google") {
+            // ── Google: Gemini text → Imagen 3 image ─────────────────────────
+            const gc = getGoogleAiClient()!;
+
+            // 1. Improve prompt with Gemini
+            const conceptRes = await gc.generateText(prompt);
+            setProgress("thumbnail-generation", 0.35);
+
+            const finalPrompt =
+              conceptRes.success && conceptRes.text ? conceptRes.text : prompt;
+
+            // 2. Generate image with Imagen 3 (falls back to Gemini 2.0 image-gen)
+            const imgRes = await gc.generateImage(finalPrompt, {
+              aspectRatio: "16:9",
+            });
+            imgDataUrl = imgRes.dataUrl;
+            imgError = imgRes.error;
           } else {
-            setProgress("thumbnail-generation", 0.1);
+            // ── OpenRouter: GPT-4o → DALL-E 3 ────────────────────────────────
+            const oc = getOpenRouterClient()!;
+            const conceptRes = await oc.ask(prompt);
+            setProgress("thumbnail-generation", 0.35);
 
-            // 1. Get thumbnail concept from GPT
-            const conceptResult = await client.ask(
-              buildThumbnailPrompt(
-                transcriptText || "Video profesional",
-                project().name || "VideoForge",
-                config.thumbnailStyle,
-              ),
-            );
+            const finalPrompt =
+              conceptRes.success && conceptRes.text ? conceptRes.text : prompt;
 
-            setProgress("thumbnail-generation", 0.4);
+            const imgRes = await oc.generateImage(finalPrompt, {
+              size: "1792x1024",
+              quality: "standard",
+            });
+            imgDataUrl = imgRes.dataUrl;
+            imgError = imgRes.error;
+          }
 
-            // 2. Generate image
-            const imgResult = await client.generateImage(
-              conceptResult.success && conceptResult.text
-                ? conceptResult.text
-                : buildThumbnailPrompt(
-                    transcriptText || "Video",
-                    project().name || "VideoForge",
-                  ),
-              { size: "1792x1024", quality: "standard" },
-            );
+          setProgress("thumbnail-generation", 1.0);
 
-            setProgress("thumbnail-generation", 1.0);
-
-            if (imgResult.success && imgResult.dataUrl) {
-              store()._setThumbnail(imgResult.dataUrl);
-              setDone("thumbnail-generation", "Miniatura generada — descarga disponible abajo");
-            } else {
-              setError("thumbnail-generation", imgResult.error ?? "No se pudo generar la imagen");
-            }
+          if (imgDataUrl) {
+            store()._setThumbnail(imgDataUrl);
+            const providerLabel = activeProvider === "google"
+              ? "Imagen 3 (Google)"
+              : "DALL-E 3 (OpenRouter)";
+            setDone("thumbnail-generation", `Generada con ${providerLabel} — descarga abajo`);
+          } else {
+            setError("thumbnail-generation", imgError ?? "No se pudo generar la imagen");
           }
         } catch (e) {
           setError("thumbnail-generation", errMsg(e));
