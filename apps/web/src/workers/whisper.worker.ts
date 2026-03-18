@@ -28,7 +28,6 @@ import {
 
 import type {
   WorkerInMessage,
-  WorkerOutMessage,
   WorkerResultMessage,
   WorkerProgressMessage,
   WorkerErrorMessage,
@@ -86,8 +85,8 @@ async function loadPipeline(
     // q4 quantization = ~4× smaller download, minimal accuracy loss
     dtype: "q4",
     progress_callback: (info: ProgressInfo) => {
-      if (info.status === "downloading") {
-        const pct = Math.round((info.progress ?? 0));
+      if (info.status === "download") {
+        const pct = Math.round(((info as unknown as { progress?: number }).progress ?? 0));
         sendProgress(
           "loading-model",
           pct,
@@ -154,14 +153,32 @@ async function handleTranscribe(
 
     sendProgress("transcribing", 5, "Transcribiendo audio…");
 
-    const result = await asr(audio, {
-      language,
-      task: "transcribe",
-      return_timestamps: "word",
-      // Process in 30-second chunks with 5-second overlap for long audio
-      chunk_length_s: 30,
-      stride_length_s: 5,
-    });
+    let result: unknown;
+    try {
+      // Try word-level timestamps first (needs cross attentions in the model)
+      result = await asr(audio, {
+        language,
+        task: "transcribe",
+        return_timestamps: "word",
+        chunk_length_s: 30,
+        stride_length_s: 5,
+      });
+    } catch (wordErr: unknown) {
+      const msg = wordErr instanceof Error ? wordErr.message : "";
+      if (msg.includes("cross attentions") || msg.includes("output_attentions")) {
+        // Model doesn't support word-level timestamps — fall back to sentence-level
+        sendProgress("transcribing", 10, "Usando timestamps a nivel de oración…");
+        result = await asr(audio, {
+          language,
+          task: "transcribe",
+          return_timestamps: true,
+          chunk_length_s: 30,
+          stride_length_s: 5,
+        });
+      } else {
+        throw wordErr;
+      }
+    }
 
     // Normalise: pipeline may return an array or a single object
     const output = Array.isArray(result) ? result[0] : result;

@@ -599,24 +599,56 @@ function errMsg(e: unknown): string {
 }
 
 /**
- * Get the full timeline audio as an AudioBuffer using the AudioEngine.
- * Falls back to fetching individual clip sources if engine is unavailable.
+ * Get the full timeline audio as an AudioBuffer.
+ *
+ * Strategy:
+ * 1. Try AudioEngine.renderAudio() (full timeline mix)
+ * 2. Fallback: decode the first clip's MediaItem blob directly
+ * 3. Fallback: fetch first clip URL and decode
  */
 async function getTimelineAudioBuffer(ctx: AudioContext): Promise<AudioBuffer | null> {
   const proj = project();
-  const duration = proj?.timeline?.duration ?? 0;
-  if (duration <= 0) return null;
+
+  // Calculate duration from clips if timeline.duration is 0
+  let duration = proj?.timeline?.duration ?? 0;
+  if (duration <= 0) {
+    const tracks = proj?.timeline?.tracks ?? [];
+    for (const track of tracks) {
+      for (const clip of track.clips ?? []) {
+        const end = (clip.startTime ?? 0) + (clip.duration ?? 0);
+        if (end > duration) duration = end;
+      }
+    }
+  }
 
   // Try AudioEngine first (renders full timeline mix)
-  try {
-    const audioEngine = useEngineStore.getState().audioEngine;
-    if (audioEngine) {
-      const rendered = await audioEngine.renderAudio(proj, 0, duration);
-      if (rendered?.buffer) return rendered.buffer;
-    }
-  } catch { /* fallback below */ }
+  if (duration > 0) {
+    try {
+      const audioEngine = useEngineStore.getState().audioEngine;
+      if (audioEngine) {
+        const rendered = await audioEngine.renderAudio(proj, 0, duration);
+        if (rendered?.buffer) return rendered.buffer;
+      }
+    } catch { /* fallback below */ }
+  }
 
-  // Fallback: decode the first clip's audio directly
+  // Fallback: decode the first clip's MediaItem blob directly
+  const { mediaItem } = getFirstClipAndMedia();
+  if (mediaItem) {
+    try {
+      const mi = mediaItem as { blob?: Blob; fileHandle?: FileSystemFileHandle };
+      let arrayBuffer: ArrayBuffer | undefined;
+      if (mi.blob) {
+        arrayBuffer = await mi.blob.arrayBuffer();
+      } else if (mi.fileHandle) {
+        const file = await mi.fileHandle.getFile();
+        arrayBuffer = await file.arrayBuffer();
+      }
+      if (arrayBuffer) return await ctx.decodeAudioData(arrayBuffer);
+    } catch { /* fallback below */ }
+  }
+
+  // Last fallback: try URL fetch
   const clip = getFirstAudioClip();
   if (!clip) return null;
   try { return await decodeClipAudio(clip, ctx); } catch { return null; }
